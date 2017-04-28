@@ -100,6 +100,7 @@ ExternalProject_Add(project_nrappkit
   DOWNLOAD_DIR "${NRAPPKIT_BUILD}/src"
   INSTALL_DIR "${NRAPPKIT_BUILD}/out"
 )
+set(NRAPPKIT_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit/include")
 
 add_library(nrappkit STATIC IMPORTED)
 set_property(TARGET nrappkit PROPERTY IMPORTED_LOCATION ${NICER_BUILD}/src/nrappkit-build/nrappkit/libnrappkit.a)
@@ -119,16 +120,16 @@ set_target_properties(nicer PROPERTIES SUFFIX ".a")
 set_source_files_properties(nicer/libnicer.a PROPERTIES GENERATED "TRUE")
 
 list(APPEND nicer__include_dirs
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/event"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/log"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/plugin"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/registry"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/share"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/stats"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/util"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/util/libekr"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/port/generic/include"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/port/generic/include/sys"
+  "${NRAPPKIT_INCLUDE}/event"
+  "${NRAPPKIT_INCLUDE}/log"
+  "${NRAPPKIT_INCLUDE}/plugin"
+  "${NRAPPKIT_INCLUDE}/registry"
+  "${NRAPPKIT_INCLUDE}/share"
+  "${NRAPPKIT_INCLUDE}/stats"
+  "${NRAPPKIT_INCLUDE}/util"
+  "${NRAPPKIT_INCLUDE}/util/libekr"
+  "${NRAPPKIT_INCLUDE}/port/generic/include"
+  "${NRAPPKIT_INCLUDE}/port/generic/include/sys"
   "${NICER_SOURCE}/src/crypto"
   "${NICER_SOURCE}/src/ice"
   "${NICER_SOURCE}/src/net"
@@ -139,12 +140,12 @@ target_include_directories(nicer PUBLIC ${nicer__include_dirs})
 
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set (NICER_OS DARWIN)
-  list(APPEND nicer__include_dirs "${NRAPPKIT_BUILD}/src/nrappkit/src/port/darwin/include"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/port/darwin/include/sys")
+  list(APPEND nicer__include_dirs "${NRAPPKIT_INCLUDE}/port/darwin/include"
+  "${NRAPPKIT_INCLUDE}/port/darwin/include/sys")
 ELSE()
   set (NICER_OS LINUX)
-  list(APPEND nicer__include_dirs "${NRAPPKIT_BUILD}/src/nrappkit/src/port/linux/include"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/port/linux/include/sys")
+  list(APPEND nicer__include_dirs "${NRAPPKIT_INCLUDE}/port/linux/include"
+  "${NRAPPKIT_INCLUDE}/port/linux/include/sys")
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 set_target_properties(nicer PROPERTIES COMPILE_FLAGS "-fPIC -Wall -Wno-parentheses -Wno-strict-prototypes -Wmissing-prototypes -DUSE_TURN -DUSE_ICE -DUSE_RFC_3489_BACKWARDS_COMPATIBLE -DUSE_STUND_0_96 -DUSE_STUN_PEDANTIC -DNR_SOCKET_IS_VOID_PTR -Drestrict=__restrict__ -DNO_REG_RPC=1 -DHAVE_VFPRINTF=1 -DRETSIGTYPE=void -DNEW_STDIO -DHAVE_STRDUP=1 -DHAVE_STRLCPY=1 -DHAVE_LIBM=1 -DHAVE_SYS_TIME_H=1 -DTIME_WITH_SYS_TIME_H=1 -D${NICER_OS} -D__UNUSED__=\"__attribute__((unused))\"")
@@ -156,19 +157,21 @@ install(TARGETS nicer
         LIBRARY DESTINATION lib)
 
 list(APPEND nicer__include_public_dirs
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/event"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/log"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/plugin"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/registry"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/share"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/stats"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/util"
-  "${NRAPPKIT_BUILD}/src/nrappkit/src/port"
+  "${NRAPPKIT_INCLUDE}/event"
+  "${NRAPPKIT_INCLUDE}/log"
+  "${NRAPPKIT_INCLUDE}/plugin"
+  "${NRAPPKIT_INCLUDE}/registry"
+  "${NRAPPKIT_INCLUDE}/share"
+  "${NRAPPKIT_INCLUDE}/stats"
+  "${NRAPPKIT_INCLUDE}/util"
+  "${NRAPPKIT_INCLUDE}/port"
   "${NICER_SOURCE}/src/crypto"
   "${NICER_SOURCE}/src/ice"
   "${NICER_SOURCE}/src/net"
   "${NICER_SOURCE}/src/stun"
   "${NICER_SOURCE}/src/util")
+
+
 
 set_property(TARGET nicer APPEND PROPERTY INCLUDE_DIRECTORIES ${nicer__include_dirs})
 

@@ -43,7 +43,7 @@ static char *RCSSTRING __UNUSED__="$Id: ice_media_stream.c,v 1.2 2008/04/28 17:5
 #include "ice_ctx.h"
 
 static char *nr_ice_media_stream_states[]={"INVALID",
-  "UNPAIRED","FROZEN","ACTIVE","COMPLETED","FAILED"
+  "UNPAIRED","FROZEN","ACTIVE","CONNECTED","FAILED"
 };
 
 int nr_ice_media_stream_set_state(nr_ice_media_stream *str, int state);
@@ -72,7 +72,9 @@ int nr_ice_media_stream_create(nr_ice_ctx *ctx,char *label,int components, nr_ic
     }
 
     TAILQ_INIT(&stream->check_list);
+    TAILQ_INIT(&stream->trigger_check_queue);
 
+    stream->disconnected = 0;
     stream->component_ct=components;
     stream->ice_state = NR_ICE_MEDIA_STREAM_UNPAIRED;
     *streamp=stream;
@@ -101,8 +103,10 @@ int nr_ice_media_stream_destroy(nr_ice_media_stream **streamp)
       nr_ice_component_destroy(&c1);
     }
 
-    TAILQ_FOREACH_SAFE(p1, &stream->check_list, entry, p2){
-      TAILQ_REMOVE(&stream->check_list,p1,entry);
+    /* Note: all the entries from the trigger check queue are held in here as
+     *       well, so we only clean up the super set. */
+    TAILQ_FOREACH_SAFE(p1, &stream->check_list, check_queue_entry, p2){
+      TAILQ_REMOVE(&stream->check_list,p1,check_queue_entry);
       nr_ice_candidate_pair_destroy(&p1);
     }
 
@@ -140,6 +144,7 @@ int nr_ice_media_stream_initialize(nr_ice_ctx *ctx, nr_ice_media_stream *stream)
     return(_status);
   }
 
+
 int nr_ice_media_stream_get_attributes(nr_ice_media_stream *stream, char ***attrsp, int *attrctp)
   {
     int attrct=0;
@@ -157,7 +162,7 @@ int nr_ice_media_stream_get_attributes(nr_ice_media_stream *stream, char ***attr
       if (comp->state != NR_ICE_COMPONENT_DISABLED) {
         cand = TAILQ_FIRST(&comp->candidates);
         while(cand){
-          if (cand->state == NR_ICE_CAND_STATE_INITIALIZED) {
+          if (!nr_ice_ctx_hide_candidate(stream->ctx, cand)) {
             ++attrct;
           }
 
@@ -189,7 +194,7 @@ int nr_ice_media_stream_get_attributes(nr_ice_media_stream *stream, char ***attr
 
         cand=TAILQ_FIRST(&comp->candidates);
         while(cand){
-          if (cand->state == NR_ICE_CAND_STATE_INITIALIZED) {
+          if (!nr_ice_ctx_hide_candidate(stream->ctx, cand)) {
             assert(index < attrct);
 
             if (index >= attrct)
@@ -223,14 +228,11 @@ int nr_ice_media_stream_get_attributes(nr_ice_media_stream *stream, char ***attr
     return(_status);
   }
 
-
 /* Get a default candidate per 4.1.4 */
 int nr_ice_media_stream_get_default_candidate(nr_ice_media_stream *stream, int component, nr_ice_candidate **candp)
   {
-    int _status;
+    int r,_status;
     nr_ice_component *comp;
-    nr_ice_candidate *cand;
-    nr_ice_candidate *best_cand = NULL;
 
     comp=STAILQ_FIRST(&stream->components);
     while(comp){
@@ -243,35 +245,11 @@ int nr_ice_media_stream_get_default_candidate(nr_ice_media_stream *stream, int c
     if (!comp)
       ABORT(R_NOT_FOUND);
 
-    /* We have the component. Now find the "best" candidate, making
-       use of the fact that more "reliable" candidate types have
-       higher numbers. So, we sort by type and then priority within
-       type
-    */
-    cand=TAILQ_FIRST(&comp->candidates);
-    while(cand){
-      if (cand->state == NR_ICE_CAND_STATE_INITIALIZED) {
-        if (!best_cand) {
-          best_cand = cand;
-        }
-        else {
-          if (best_cand->type < cand->type) {
-            best_cand = cand;
-          } else if (best_cand->type == cand->type) {
-            if (best_cand->priority < cand->priority)
-              best_cand = cand;
-          }
-        }
-      }
-
-      cand=TAILQ_NEXT(cand,entry_comp);
+    /* If there aren't any IPV4 candidates, try IPV6 */
+    if((r=nr_ice_component_get_default_candidate(comp, candp, NR_IPV4)) &&
+       (r=nr_ice_component_get_default_candidate(comp, candp, NR_IPV6))) {
+      ABORT(r);
     }
-
-    /* No candidates */
-    if (!best_cand)
-      ABORT(R_NOT_FOUND);
-
-    *candp = best_cand;
 
     _status=0;
   abort:
@@ -334,46 +312,57 @@ int nr_ice_media_stream_service_pre_answer_requests(nr_ice_peer_ctx *pctx, nr_ic
     return(_status);
   }
 
-/* S 5.8 -- run the highest priority WAITING pair or if not available
-   FROZEN pair */
+/* S 5.8 -- run the first pair from the triggered check queue (even after
+ * checks have completed S 8.1.2) or run the highest priority WAITING pair or
+ * if not available FROZEN pair from the check queue */
 static void nr_ice_media_stream_check_timer_cb(NR_SOCKET s, int h, void *cb_arg)
   {
     int r,_status;
     nr_ice_media_stream *stream=cb_arg;
-    nr_ice_cand_pair *pair;
-    int timer_val;
+    nr_ice_cand_pair *pair = 0;
+    int timer_multiplier=stream->pctx->active_streams ? stream->pctx->active_streams : 1;
+    int timer_val=stream->pctx->ctx->Ta*timer_multiplier;
 
-    assert(stream->pctx->active_streams!=0);
-
-    timer_val=stream->pctx->ctx->Ta*stream->pctx->active_streams;
-
-    if (stream->ice_state == NR_ICE_MEDIA_STREAM_CHECKS_COMPLETED) {
-      r_log(LOG_ICE,LOG_ERR,"ICE-PEER(%s): (bug) bogus state for stream %s",stream->pctx->label,stream->label);
-    }
-    assert(stream->ice_state != NR_ICE_MEDIA_STREAM_CHECKS_COMPLETED);
+    assert(timer_val>0);
 
     r_log(LOG_ICE,LOG_DEBUG,"ICE-PEER(%s): check timer expired for media stream %s",stream->pctx->label,stream->label);
     stream->timer=0;
 
-    /* Find the highest priority WAITING check and move it to RUNNING */
-    pair=TAILQ_FIRST(&stream->check_list);
+    /* The trigger check queue has the highest priority */
+    pair=TAILQ_FIRST(&stream->trigger_check_queue);
     while(pair){
-      if(pair->state==NR_ICE_PAIR_STATE_WAITING)
+      if(pair->state==NR_ICE_PAIR_STATE_WAITING){
+        /* Remove the pair from he trigger check queue */
+        r_log(LOG_ICE,LOG_DEBUG,"ICE-PEER(%s): Removing pair from trigger check queue %s",stream->pctx->label,pair->as_string);
+        TAILQ_REMOVE(&stream->trigger_check_queue,pair,triggered_check_queue_entry);
         break;
-      pair=TAILQ_NEXT(pair,entry);
+      }
+      pair=TAILQ_NEXT(pair,triggered_check_queue_entry);
     }
 
-    /* Hmmm... No WAITING. Let's look for FROZEN */
-    if(!pair){
-      pair=TAILQ_FIRST(&stream->check_list);
-
-      while(pair){
-        if(pair->state==NR_ICE_PAIR_STATE_FROZEN){
-          if(r=nr_ice_candidate_pair_unfreeze(stream->pctx,pair))
-            ABORT(r);
-          break;
+    if (stream->ice_state != NR_ICE_MEDIA_STREAM_CHECKS_CONNECTED) {
+      if(!pair){
+        /* Find the highest priority WAITING check and move it to RUNNING */
+        pair=TAILQ_FIRST(&stream->check_list);
+        while(pair){
+          if(pair->state==NR_ICE_PAIR_STATE_WAITING)
+            break;
+          pair=TAILQ_NEXT(pair,check_queue_entry);
         }
-        pair=TAILQ_NEXT(pair,entry);
+      }
+
+      /* Hmmm... No WAITING. Let's look for FROZEN */
+      if(!pair){
+        pair=TAILQ_FIRST(&stream->check_list);
+
+        while(pair){
+          if(pair->state==NR_ICE_PAIR_STATE_FROZEN){
+            if(r=nr_ice_candidate_pair_unfreeze(stream->pctx,pair))
+              ABORT(r);
+            break;
+          }
+          pair=TAILQ_NEXT(pair,check_queue_entry);
+        }
       }
     }
 
@@ -390,20 +379,25 @@ static void nr_ice_media_stream_check_timer_cb(NR_SOCKET s, int h, void *cb_arg)
     return;
   }
 
-
 /* Start checks for this media stream (aka check list) */
 int nr_ice_media_stream_start_checks(nr_ice_peer_ctx *pctx, nr_ice_media_stream *stream)
   {
     int r,_status;
 
-    /* Don't start the check timer if the stream is done (failed/completed) */
-    if (stream->ice_state > NR_ICE_MEDIA_STREAM_CHECKS_ACTIVE) {
+    /* Don't start the check timer if the stream is failed */
+    if (stream->ice_state == NR_ICE_MEDIA_STREAM_CHECKS_FAILED) {
       assert(0);
       ABORT(R_INTERNAL);
     }
 
-    if(r=nr_ice_media_stream_set_state(stream,NR_ICE_MEDIA_STREAM_CHECKS_ACTIVE))
-      ABORT(r);
+    /* Even if the stream is completed already remote can still create a new
+     * triggered check request which needs to fire, but not change our stream
+     * state. */
+    if (stream->ice_state != NR_ICE_MEDIA_STREAM_CHECKS_CONNECTED) {
+      if(r=nr_ice_media_stream_set_state(stream,NR_ICE_MEDIA_STREAM_CHECKS_ACTIVE)) {
+        ABORT(r);
+      }
+    }
 
     if (!stream->timer) {
       r_log(LOG_ICE,LOG_INFO,"ICE-PEER(%s)/ICE-STREAM(%s): Starting check timer for stream.",pctx->label,stream->label);
@@ -445,7 +439,7 @@ int nr_ice_media_stream_unfreeze_pairs(nr_ice_peer_ctx *pctx, nr_ice_media_strea
       }
 
       /* Already exists... fall through */
-      pair=TAILQ_NEXT(pair,entry);
+      pair=TAILQ_NEXT(pair,check_queue_entry);
     }
 
     _status=0;
@@ -468,7 +462,7 @@ static int nr_ice_media_stream_unfreeze_pairs_match(nr_ice_media_stream *stream,
           ABORT(r);
         unfroze++;
       }
-      pair=TAILQ_NEXT(pair,entry);
+      pair=TAILQ_NEXT(pair,check_queue_entry);
     }
 
     if(!unfroze)
@@ -558,7 +552,7 @@ int nr_ice_media_stream_dump_state(nr_ice_peer_ctx *pctx, nr_ice_media_stream *s
     while(pair){
       nr_ice_candidate_pair_dump_state(pair,out);
 
-      pair=TAILQ_NEXT(pair,entry);
+      pair=TAILQ_NEXT(pair,check_queue_entry);
     }
 
     return(0);
@@ -591,6 +585,75 @@ int nr_ice_media_stream_set_state(nr_ice_media_stream *str, int state)
     return(0);
   }
 
+
+void nr_ice_media_stream_refresh_consent_all(nr_ice_media_stream *stream)
+  {
+    nr_ice_component *comp;
+
+    comp=STAILQ_FIRST(&stream->components);
+    while(comp){
+      if(comp->disconnected) {
+        nr_ice_component_refresh_consent_now(comp);
+      }
+
+      comp=STAILQ_NEXT(comp,entry);
+    }
+  }
+
+void nr_ice_media_stream_disconnect_all_components(nr_ice_media_stream *stream)
+  {
+    nr_ice_component *comp;
+
+    comp=STAILQ_FIRST(&stream->components);
+    while(comp){
+      comp->disconnected = 1;
+
+      comp=STAILQ_NEXT(comp,entry);
+    }
+  }
+
+void nr_ice_media_stream_set_disconnected(nr_ice_media_stream *stream, int disconnected)
+  {
+    if (stream->disconnected == disconnected) {
+      return;
+    }
+
+    if (stream->ice_state != NR_ICE_MEDIA_STREAM_CHECKS_CONNECTED) {
+      return;
+    }
+    stream->disconnected = disconnected;
+
+    if (disconnected == NR_ICE_MEDIA_STREAM_DISCONNECTED) {
+      nr_ice_peer_ctx_disconnected(stream->pctx);
+    } else {
+      nr_ice_peer_ctx_check_if_connected(stream->pctx);
+    }
+  }
+
+int nr_ice_media_stream_check_if_connected(nr_ice_media_stream *stream)
+  {
+    nr_ice_component *comp;
+
+    comp=STAILQ_FIRST(&stream->components);
+    while(comp){
+      if((comp->state != NR_ICE_COMPONENT_DISABLED) &&
+         (comp->local_component->state != NR_ICE_COMPONENT_DISABLED) &&
+         comp->disconnected)
+        break;
+
+      comp=STAILQ_NEXT(comp,entry);
+    }
+
+    /* At least one disconnected component */
+    if(comp)
+      goto done;
+
+    nr_ice_media_stream_set_disconnected(stream, NR_ICE_MEDIA_STREAM_CONNECTED);
+
+  done:
+    return(0);
+  }
+
 /* S OK, this component has a nominated. If every component has a nominated,
    the stream is ready */
 int nr_ice_media_stream_component_nominated(nr_ice_media_stream *stream,nr_ice_component *component)
@@ -614,7 +677,7 @@ int nr_ice_media_stream_component_nominated(nr_ice_media_stream *stream,nr_ice_c
 
     /* All done... */
     r_log(LOG_ICE,LOG_INFO,"ICE-PEER(%s)/ICE-STREAM(%s): all active components have nominated candidate pairs",stream->pctx->label,stream->label);
-    nr_ice_media_stream_set_state(stream,NR_ICE_MEDIA_STREAM_CHECKS_COMPLETED);
+    nr_ice_media_stream_set_state(stream,NR_ICE_MEDIA_STREAM_CHECKS_CONNECTED);
 
     /* Cancel our timer */
     if(stream->timer){
@@ -626,8 +689,8 @@ int nr_ice_media_stream_component_nominated(nr_ice_media_stream *stream,nr_ice_c
       stream->pctx->handler->vtbl->stream_ready(stream->pctx->handler->obj,stream->local_stream);
     }
 
-    /* Now tell the peer_ctx that we're done */
-    if(r=nr_ice_peer_ctx_check_if_done(stream->pctx))
+    /* Now tell the peer_ctx that we're connected */
+    if(r=nr_ice_peer_ctx_check_if_connected(stream->pctx))
       ABORT(r);
 
   done:
@@ -651,10 +714,10 @@ int nr_ice_media_stream_component_failed(nr_ice_media_stream *stream,nr_ice_comp
     /* OK, we need to cancel off everything on this component */
     p2=TAILQ_FIRST(&stream->check_list);
     while(p2){
-      if(r=nr_ice_candidate_pair_cancel(p2->pctx,p2))
+      if(r=nr_ice_candidate_pair_cancel(p2->pctx,p2,0))
         ABORT(r);
 
-      p2=TAILQ_NEXT(p2,entry);
+      p2=TAILQ_NEXT(p2,check_queue_entry);
     }
 
     /* Cancel our timer */
@@ -663,12 +726,15 @@ int nr_ice_media_stream_component_failed(nr_ice_media_stream *stream,nr_ice_comp
       stream->timer=0;
     }
 
+    /* Cancel consent timers in case it is running already */
+    nr_ice_component_consent_destroy(component);
+
     if (stream->pctx->handler) {
       stream->pctx->handler->vtbl->stream_failed(stream->pctx->handler->obj,stream->local_stream);
     }
 
-    /* Now tell the peer_ctx that we're done */
-    if(r=nr_ice_peer_ctx_check_if_done(stream->pctx))
+    /* Now tell the peer_ctx that we're connected */
+    if(r=nr_ice_peer_ctx_check_if_connected(stream->pctx))
       ABORT(r);
 
     _status=0;
@@ -745,14 +811,21 @@ int nr_ice_media_stream_send(nr_ice_peer_ctx *pctx, nr_ice_media_stream *str, in
     if(!comp->active)
       ABORT(R_NOT_FOUND);
 
+    /* Does fresh ICE consent exist? */
+    if(!comp->can_send)
+      ABORT(R_FAILED);
+
     /* OK, write to that pair, which means:
        1. Use the socket on our local side.
        2. Use the address on the remote side
     */
-    comp->keepalive_needed=0; /* Suppress keepalives */
     if(r=nr_socket_sendto(comp->active->local->osock,data,len,0,
-                          &comp->active->remote->addr))
+                          &comp->active->remote->addr)) {
+      if ((r==R_IO_ERROR) || (r==R_EOD)) {
+        nr_ice_component_disconnected(comp);
+      }
       ABORT(r);
+    }
 
     _status=0;
   abort:
@@ -849,7 +922,24 @@ int nr_ice_media_stream_pair_new_trickle_candidate(nr_ice_peer_ctx *pctx, nr_ice
       ABORT(r);
 
     _status=0;
- abort:
+  abort:
+    return(_status);
+  }
+
+int nr_ice_media_stream_get_consent_status(nr_ice_media_stream *stream, int
+component_id, int *can_send, struct timeval *ts)
+  {
+    int r,_status;
+    nr_ice_component *comp;
+
+    if ((r=nr_ice_media_stream_find_component(stream, component_id, &comp)))
+      ABORT(r);
+
+    *can_send = comp->can_send;
+    ts->tv_sec = comp->consent_last_seen.tv_sec;
+    ts->tv_usec = comp->consent_last_seen.tv_usec;
+    _status=0;
+  abort:
     return(_status);
   }
 
@@ -872,19 +962,49 @@ int nr_ice_media_stream_disable_component(nr_ice_media_stream *stream, int compo
     comp->state = NR_ICE_COMPONENT_DISABLED;
 
     _status=0;
- abort:
+  abort:
     return(_status);
   }
 
 void nr_ice_media_stream_role_change(nr_ice_media_stream *stream)
   {
-    nr_ice_cand_pair *pair;
+    nr_ice_cand_pair *pair,*temp_pair;
+    /* Changing role causes candidate pair priority to change, which requires
+     * re-sorting the check list. */
+    nr_ice_cand_pair_head old_checklist;
+
     assert(stream->ice_state != NR_ICE_MEDIA_STREAM_UNPAIRED);
 
-    pair=TAILQ_FIRST(&stream->check_list);
-    while(pair){
+    /* Move check_list to old_checklist (not POD, have to do the hard way) */
+    TAILQ_INIT(&old_checklist);
+    TAILQ_FOREACH_SAFE(pair,&stream->check_list,check_queue_entry,temp_pair) {
+      TAILQ_REMOVE(&stream->check_list,pair,check_queue_entry);
+      TAILQ_INSERT_TAIL(&old_checklist,pair,check_queue_entry);
+    }
+
+    /* Re-insert into the check list */
+    TAILQ_FOREACH_SAFE(pair,&old_checklist,check_queue_entry,temp_pair) {
+      TAILQ_REMOVE(&old_checklist,pair,check_queue_entry);
       nr_ice_candidate_pair_role_change(pair);
-      pair=TAILQ_NEXT(pair,entry);
+      nr_ice_candidate_pair_insert(&stream->check_list,pair);
     }
   }
 
+int nr_ice_media_stream_find_pair(nr_ice_media_stream *str, nr_ice_candidate *lcand, nr_ice_candidate *rcand, nr_ice_cand_pair **pair)
+  {
+    nr_ice_cand_pair_head *head = &str->check_list;
+    nr_ice_cand_pair *c1;
+
+    c1=TAILQ_FIRST(head);
+    while(c1){
+      if(c1->local == lcand &&
+         c1->remote == rcand) {
+        *pair=c1;
+        return(0);
+      }
+
+      c1=TAILQ_NEXT(c1,check_queue_entry);
+    }
+
+    return(R_NOT_FOUND);
+  }

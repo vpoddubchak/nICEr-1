@@ -1,5 +1,6 @@
 /*
 Copyright (c) 2007, Adobe Systems, Incorporated
+Copyright (c) 2014, Mozilla
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,29 +31,22 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#ifndef _nr_socket_multi_tcp_h
+#define _nr_socket_multi_tcp_h
 
+#include "nr_socket.h"
 
-#ifndef _stun_reg_h
-#define _stun_reg_h
-#ifdef __cplusplus
-using namespace std;
-extern "C" {
-#endif /* __cplusplus */
+/* Argument use_framing is 0 only in call from test code (STUN TCP server
+   listening socket). For other purposes it should be always set to true */
 
-#define NR_STUN_REG_PREF_CLNT_RETRANSMIT_TIMEOUT    "stun.client.retransmission_timeout"
-#define NR_STUN_REG_PREF_CLNT_RETRANSMIT_BACKOFF    "stun.client.retransmission_backoff_factor"
-#define NR_STUN_REG_PREF_CLNT_MAXIMUM_TRANSMITS     "stun.client.maximum_transmits"
-#define NR_STUN_REG_PREF_CLNT_FINAL_RETRANSMIT_BACKOFF   "stun.client.final_retransmit_backoff"
+int nr_socket_multi_tcp_create(struct nr_ice_ctx_ *ctx,
+  nr_transport_addr *addr,  nr_socket_tcp_type tcp_type,
+  int precreated_so_count, int max_pending, nr_socket **sockp);
 
-#define NR_STUN_REG_PREF_ALLOW_LOOPBACK_ADDRS            "stun.allow_loopback"
-#define NR_STUN_REG_PREF_ALLOW_LINK_LOCAL_ADDRS     "stun.allow_link_local"
-#define NR_STUN_REG_PREF_ADDRESS_PRFX               "stun.address"
-#define NR_STUN_REG_PREF_SERVER_NAME                "stun.server.name"
-#define NR_STUN_REG_PREF_SERVER_NONCE_SIZE          "stun.server.nonce_size"
-#define NR_STUN_REG_PREF_SERVER_REALM               "stun.server.realm"
+int nr_socket_multi_tcp_set_readable_cb(nr_socket *sock,
+  NR_async_cb readable_cb,void *readable_cb_arg);
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
+int nr_socket_multi_tcp_stun_server_connect(nr_socket *sock,
+  nr_transport_addr *addr);
+
 #endif
-

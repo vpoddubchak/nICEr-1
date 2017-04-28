@@ -52,6 +52,7 @@ typedef struct nr_turn_stun_ctx_ {
   char *realm;
   NR_async_cb success_cb;
   NR_async_cb error_cb;
+  int last_error_code;
 
   STAILQ_ENTRY(nr_turn_stun_ctx_) entry;
 } nr_turn_stun_ctx;
@@ -100,6 +101,11 @@ typedef struct nr_turn_client_ctx_ {
 
   void *connected_timer_handle;
   void *refresh_timer_handle;
+
+  // ice telemetry
+  UINT2 cnt_401s;
+  UINT2 cnt_403s;
+  UINT2 cnt_438s;
 } nr_turn_client_ctx;
 
 extern int NR_LOG_TURN;
@@ -119,6 +125,7 @@ int nr_turn_client_process_response(nr_turn_client_ctx *ctx,
                                     UCHAR *msg, int len,
                                     nr_transport_addr *turn_server_addr);
 int nr_turn_client_cancel(nr_turn_client_ctx *ctx);
+int nr_turn_client_failed(nr_turn_client_ctx *ctx);
 int nr_turn_client_deallocate(nr_turn_client_ctx *ctx);
 int nr_turn_client_send_indication(nr_turn_client_ctx *ctx,
                                    const UCHAR *msg, size_t len,
@@ -129,5 +136,7 @@ int nr_turn_client_parse_data_indication(nr_turn_client_ctx *ctx,
                                          UCHAR *newmsg, size_t *newlen,
                                          size_t newsize,
                                          nr_transport_addr *remote_addr);
+int nr_turn_client_ensure_perm(nr_turn_client_ctx *ctx,
+                               nr_transport_addr *addr);
 #endif
 

@@ -83,7 +83,7 @@ static nr_socket_vtbl nr_socket_local_vtbl={
   nr_socket_local_close
 };
 
-int nr_socket_local_create(nr_transport_addr *addr, nr_socket **sockp)
+int nr_socket_local_create(void *obj, nr_transport_addr *addr, nr_socket **sockp)
   {
     int r,_status;
     nr_socket_local *lcl=0;
@@ -151,7 +151,7 @@ int nr_socket_local_create(nr_transport_addr *addr, nr_socket **sockp)
         ABORT(R_INTERNAL);
       }
       if(r=nr_sockaddr_to_transport_addr((struct sockaddr *)&addr6,namelen,
-        addr->protocol,1,&lcl->my_addr))
+        addr->protocol,&lcl->my_addr))
         ABORT(r);
     }
 
@@ -234,7 +234,7 @@ static int nr_socket_local_recvfrom(void *obj,void * restrict buf,
     *len=r;
 
     if(r=nr_sockaddr_to_transport_addr((struct sockaddr *)&from,fromlen,
-      lcl->my_addr.protocol,0,addr))
+      lcl->my_addr.protocol,addr))
       ABORT(r);
 
     //r_log(LOG_GENERIC,LOG_DEBUG,"Read %d bytes from %s",*len,addr->as_string);

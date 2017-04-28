@@ -71,7 +71,7 @@ nr_stun_startup(void)
 }
 
 int
-nr_stun_xor_mapped_address(UINT4 magicCookie, nr_transport_addr *from, nr_transport_addr *to)
+nr_stun_xor_mapped_address(UINT4 magicCookie, UINT12 transactionId, nr_transport_addr *from, nr_transport_addr *to)
 {
     int _status;
 
@@ -83,8 +83,26 @@ nr_stun_xor_mapped_address(UINT4 magicCookie, nr_transport_addr *from, nr_transp
             from->protocol, to);
         break;
     case NR_IPV6:
-        assert(0);
-        ABORT(R_INTERNAL);
+        {
+          union {
+            unsigned char addr[16];
+            UINT4 addr32[4];
+          } maskedAddr;
+
+          maskedAddr.addr32[0] = htonl(magicCookie); /* Passed in host byte order */
+          memcpy(&maskedAddr.addr32[1], transactionId.octet, sizeof(transactionId));
+
+          /* We now have the mask in network byte order */
+          /* Xor the address in network byte order */
+          for (int i = 0; i < sizeof(maskedAddr); ++i) {
+            maskedAddr.addr[i] ^= from->u.addr6.sin6_addr.s6_addr[i];
+          }
+
+          nr_ip6_port_to_transport_addr(
+              (struct in6_addr*)&maskedAddr,
+              (ntohs(from->u.addr6.sin6_port) ^ (magicCookie>>16)),
+              from->protocol, to);
+        }
         break;
     default:
         assert(0);
@@ -98,28 +116,55 @@ nr_stun_xor_mapped_address(UINT4 magicCookie, nr_transport_addr *from, nr_transp
 }
 
 int
+nr_stun_filter_local_addresses(nr_local_addr addrs[], int *count)
+{
+    int r,_status;
+    char allow_loopback = 0;
+    char allow_link_local = 0;
+
+    if ((r=NR_reg_get_char(NR_STUN_REG_PREF_ALLOW_LOOPBACK_ADDRS,
+                           &allow_loopback))) {
+        if (r != R_NOT_FOUND) {
+            ABORT(r);
+        }
+    }
+
+    if ((r=NR_reg_get_char(NR_STUN_REG_PREF_ALLOW_LINK_LOCAL_ADDRS,
+                           &allow_link_local))) {
+        if (r != R_NOT_FOUND) {
+            ABORT(r);
+        }
+    }
+
+    if ((r=nr_stun_remove_duplicate_addrs(addrs,
+                                          !allow_loopback,
+                                          !allow_link_local,
+                                          count))) {
+        ABORT(r);
+    }
+
+    _status=0;
+ abort:
+    return _status;
+}
+
+int
 nr_stun_find_local_addresses(nr_local_addr addrs[], int maxaddrs, int *count)
 {
     int r,_status;
-    NR_registry *children = 0;
+    //NR_registry *children = 0;
 
+    *count = 0;
+
+#if 0
+    // this really goes with the code commented out below. (mjf)
     if ((r=NR_reg_get_child_count(NR_STUN_REG_PREF_ADDRESS_PRFX, (unsigned int*)count)))
-        if (r == R_NOT_FOUND)
-            *count = 0;
-        else
+        if (r != R_NOT_FOUND)
             ABORT(r);
+#endif
 
     if (*count == 0) {
-        char allow_loopback;
-
-        if ((r=NR_reg_get_char(NR_STUN_REG_PREF_ALLOW_LOOPBACK_ADDRS, &allow_loopback))) {
-            if (r == R_NOT_FOUND)
-                allow_loopback = 0;
-            else
-                ABORT(r);
-        }
-
-        if ((r=nr_stun_get_addrs(addrs, maxaddrs, !allow_loopback, count)))
+        if ((r=nr_stun_get_addrs(addrs, maxaddrs, count)))
             ABORT(r);
 
         goto done;
@@ -156,7 +201,7 @@ nr_stun_find_local_addresses(nr_local_addr addrs[], int maxaddrs, int *count)
 
      _status=0;
  abort:
-     RFREE(children);
+     //RFREE(children);
      return _status;
 }
 
