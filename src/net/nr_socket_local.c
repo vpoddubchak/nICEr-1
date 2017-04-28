@@ -74,6 +74,7 @@ static int nr_socket_local_getaddr(void *obj, nr_transport_addr *addrp);
 static int nr_socket_local_close(void *obj);
 
 static nr_socket_vtbl nr_socket_local_vtbl={
+  2,
   nr_socket_local_destroy,
   nr_socket_local_sendto,
   nr_socket_local_recvfrom,
@@ -105,7 +106,7 @@ int nr_socket_local_create(nr_transport_addr *addr, nr_socket **sockp)
     if(!(lcl=RCALLOC(sizeof(nr_socket_local))))
       ABORT(R_NO_MEMORY);
     lcl->sock=-1;
-      
+
     if((lcl->sock=socket(addr->addr->sa_family, stype, addr->protocol))<0){
       r_log(LOG_GENERIC,LOG_CRIT,"Couldn't create socket");
       //r_log_e(LOG_GENERIC,LOG_CRIT,"Couldn't create socket");
@@ -136,7 +137,7 @@ int nr_socket_local_create(nr_transport_addr *addr, nr_socket **sockp)
       // r_log_e(LOG_GENERIC,LOG_CRIT,"Couldn't fix socket with WSAIoctl");
       ABORT(R_INTERNAL);
     }
-  
+
   }
 #endif
 
@@ -153,7 +154,7 @@ int nr_socket_local_create(nr_transport_addr *addr, nr_socket **sockp)
         addr->protocol,1,&lcl->my_addr))
         ABORT(r);
     }
-    
+
     if(r=nr_socket_create_int(lcl, &nr_socket_local_vtbl, sockp))
       ABORT(r);
 
@@ -182,7 +183,7 @@ static int nr_socket_local_destroy(void **objp)
       NR_SOCKET_CLOSE(lcl->sock);
 
     RFREE(lcl);
-    
+
     return(0);
   }
 
@@ -235,7 +236,7 @@ static int nr_socket_local_recvfrom(void *obj,void * restrict buf,
     if(r=nr_sockaddr_to_transport_addr((struct sockaddr *)&from,fromlen,
       lcl->my_addr.protocol,0,addr))
       ABORT(r);
-    
+
     //r_log(LOG_GENERIC,LOG_DEBUG,"Read %d bytes from %s",*len,addr->as_string);
 
     _status=0;
@@ -258,7 +259,7 @@ static int nr_socket_local_getfd(void *obj, NR_SOCKET *fd)
 static int nr_socket_local_getaddr(void *obj, nr_transport_addr *addrp)
   {
     nr_socket_local *lcl=obj;
-      
+
     nr_transport_addr_copy(addrp,&lcl->my_addr);
 
     return(0);
