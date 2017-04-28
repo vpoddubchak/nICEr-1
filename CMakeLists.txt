@@ -15,6 +15,7 @@ list(APPEND nicer__c_srcs
     "${NICER_SOURCE}/src/crypto/nr_crypto.c"
     "${NICER_SOURCE}/src/ice/ice_candidate.c"
     "${NICER_SOURCE}/src/ice/ice_candidate_pair.c"
+    "${NICER_SOURCE}/src/ice/ice_codeword.c"
     "${NICER_SOURCE}/src/ice/ice_component.c"
     "${NICER_SOURCE}/src/ice/ice_ctx.c"
     "${NICER_SOURCE}/src/ice/ice_media_stream.c"
