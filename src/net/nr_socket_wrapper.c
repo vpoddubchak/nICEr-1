@@ -71,7 +71,7 @@ int nr_socket_wrapper_factory_destroy(nr_socket_wrapper_factory **wrapperp)
   wrapper = *wrapperp;
   *wrapperp = 0;
 
-  assert(wrapper->vtbl);
+  //assert(wrapper->vtbl);
   if (wrapper->vtbl)
     wrapper->vtbl->destroy(&wrapper->obj);
 
@@ -79,4 +79,3 @@ int nr_socket_wrapper_factory_destroy(nr_socket_wrapper_factory **wrapperp)
 
   return 0;
 }
-
