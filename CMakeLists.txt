@@ -26,13 +26,13 @@ list(APPEND nicer__c_srcs
     "${NICER_SOURCE}/src/net/nr_proxy_tunnel.c"
     "${NICER_SOURCE}/src/net/nr_socket.c"
     "${NICER_SOURCE}/src/net/nr_socket_local.c"
-    #"${NICER_SOURCE}/src/net/nr_socket_multi_tcp.c"
+    "${NICER_SOURCE}/src/net/nr_socket_multi_tcp.c"
     "${NICER_SOURCE}/src/net/transport_addr.c"
     "${NICER_SOURCE}/src/net/transport_addr_reg.c"
     "${NICER_SOURCE}/src/net/local_addr.c"
     "${NICER_SOURCE}/src/net/nr_interface_prioritizer.c"
     "${NICER_SOURCE}/src/stun/addrs.c"
-    #"${NICER_SOURCE}/src/stun/ifaddrs-android.c"
+    "${NICER_SOURCE}/src/stun/ifaddrs-android.c"
     "${NICER_SOURCE}/src/stun/nr_socket_turn.c"
     "${NICER_SOURCE}/src/stun/nr_socket_buffered_stun.c"
     "${NICER_SOURCE}/src/stun/stun_build.c"
@@ -65,13 +65,13 @@ list(APPEND nicer__other_srcs
     "${NICER_SOURCE}/src/net/nr_proxy_tunnel.h"
     "${NICER_SOURCE}/src/net/nr_socket.h"
     "${NICER_SOURCE}/src/net/nr_socket_local.h"
-    #"${NICER_SOURCE}/src/net/nr_socket_multi_tcp.h"
+    "${NICER_SOURCE}/src/net/nr_socket_multi_tcp.h"
     "${NICER_SOURCE}/src/net/transport_addr.h"
     "${NICER_SOURCE}/src/net/transport_addr_reg.h"
     "${NICER_SOURCE}/src/net/local_addr.h"
     "${NICER_SOURCE}/src/net/nr_interface_prioritizer.h"
     "${NICER_SOURCE}/src/stun/addrs.h"
-    #"${NICER_SOURCE}/src/stun/ifaddrs-android.h"
+    "${NICER_SOURCE}/src/stun/ifaddrs-android.h"
     "${NICER_SOURCE}/src/stun/nr_socket_turn.h"
     "${NICER_SOURCE}/src/stun/nr_socket_buffered_stun.h"
     "${NICER_SOURCE}/src/stun/stun.h"
@@ -103,9 +103,9 @@ ExternalProject_Add(project_nrappkit
 set(NRAPPKIT_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit/include")
 
 add_library(nrappkit STATIC IMPORTED)
-set_property(TARGET nrappkit PROPERTY IMPORTED_LOCATION ${NICER_BUILD}/src/nrappkit-build/nrappkit/libnrappkit.a)
-add_dependencies(nicer project_nrappkit)
+set_property(TARGET nrappkit PROPERTY IMPORTED_LOCATION ${NRAPPKIT_BUILD}/src/project_nrappkit-build/nrappkit/libnrappkit.a)
 
+add_dependencies(nrappkit project_nrappkit)
 add_dependencies(nicer nrappkit)
 
 set_target_properties(nicer PROPERTIES EXCLUDE_FROM_ALL "FALSE")
@@ -150,11 +150,8 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 set_target_properties(nicer PROPERTIES COMPILE_FLAGS "-fPIC -Wall -Wno-parentheses -Wno-strict-prototypes -Wmissing-prototypes -DUSE_TURN -DUSE_ICE -DUSE_RFC_3489_BACKWARDS_COMPATIBLE -DUSE_STUND_0_96 -DUSE_STUN_PEDANTIC -DNR_SOCKET_IS_VOID_PTR -Drestrict=__restrict__ -DNO_REG_RPC=1 -DHAVE_VFPRINTF=1 -DRETSIGTYPE=void -DNEW_STDIO -DHAVE_STRDUP=1 -DHAVE_STRLCPY=1 -DHAVE_LIBM=1 -DHAVE_SYS_TIME_H=1 -DTIME_WITH_SYS_TIME_H=1 -D${NICER_OS} -D__UNUSED__=\"__attribute__((unused))\"")
 
-target_link_libraries(nicer nrappkit)
+target_link_libraries(nicer PRIVATE nrappkit)
 
-install(TARGETS nicer
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib)
 
 list(APPEND nicer__include_public_dirs
   "${NRAPPKIT_INCLUDE}/event"
@@ -171,8 +168,9 @@ list(APPEND nicer__include_public_dirs
   "${NICER_SOURCE}/src/stun"
   "${NICER_SOURCE}/src/util")
 
-
-
 set_property(TARGET nicer APPEND PROPERTY INCLUDE_DIRECTORIES ${nicer__include_dirs})
 
+install(TARGETS nicer
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib)
 install(DIRECTORY ${nicer__include_public_dirs} DESTINATION include  FILES_MATCHING PATTERN "**.h")
