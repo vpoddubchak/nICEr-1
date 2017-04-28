@@ -172,4 +172,4 @@ list(APPEND nicer__include_public_dirs
 
 set_property(TARGET nicer APPEND PROPERTY INCLUDE_DIRECTORIES ${nicer__include_dirs})
 
-install(DIRECTORY ${nicer__include_public_dirs} DESTINATION ${NICER_BUILD}/include)
+install(DIRECTORY ${nicer__include_public_dirs} DESTINATION include  FILES_MATCHING PATTERN "**.h")
