@@ -11,16 +11,6 @@ set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
 
 set (NICER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR})
 
-set(NRAPPKIT_BUILD "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit")
-ExternalProject_Add(nrappkit
-  GIT_REPOSITORY "git@github.com:lynckia/nrappkit.git"
-  GIT_TAG "master"
-  PREFIX ${NRAPPKIT_BUILD}
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD}
-  DOWNLOAD_DIR "${NRAPPKIT_BUILD}/src"
-  INSTALL_COMMAND ""
-)
-
 list(APPEND nicer__c_srcs
     "${NICER_SOURCE}/src/crypto/nr_crypto.c"
     "${NICER_SOURCE}/src/ice/ice_candidate.c"
@@ -101,6 +91,20 @@ list(APPEND nicer__other_srcs
 
 add_library(nicer STATIC ${nicer__c_srcs} ${nicer__other_srcs})
 
+set(NRAPPKIT_BUILD "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit")
+ExternalProject_Add(project_nrappkit
+  GIT_REPOSITORY "git@github.com:lynckia/nrappkit.git"
+  GIT_TAG "master"
+  PREFIX ${NRAPPKIT_BUILD}
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD}
+  DOWNLOAD_DIR "${NRAPPKIT_BUILD}/src"
+  INSTALL_COMMAND ""
+)
+
+add_library(nrappkit STATIC IMPORTED)
+set_property(TARGET nrappkit PROPERTY IMPORTED_LOCATION ${NICER_BUILD}/src/nrappkit-build/nrappkit/libnrappkit.a)
+add_dependencies(nicer project_nrappkit)
+
 add_dependencies(nicer nrappkit)
 
 set_target_properties(nicer PROPERTIES EXCLUDE_FROM_ALL "FALSE")
@@ -130,6 +134,8 @@ list(APPEND nicer__include_dirs
   "${NICER_SOURCE}/src/net"
   "${NICER_SOURCE}/src/stun"
   "${NICER_SOURCE}/src/util")
+
+target_include_directories(nicer PUBLIC ${nicer__include_dirs})
 
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set (NICER_OS DARWIN)
