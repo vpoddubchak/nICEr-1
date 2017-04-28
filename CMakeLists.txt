@@ -98,7 +98,7 @@ ExternalProject_Add(project_nrappkit
   PREFIX ${NRAPPKIT_BUILD}
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD}
   DOWNLOAD_DIR "${NRAPPKIT_BUILD}/src"
-  INSTALL_COMMAND ""
+  INSTALL_DIR "${NRAPPKIT_BUILD}/out"
 )
 
 add_library(nrappkit STATIC IMPORTED)
@@ -149,6 +149,27 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 set_target_properties(nicer PROPERTIES COMPILE_FLAGS "-fPIC -Wall -Wno-parentheses -Wno-strict-prototypes -Wmissing-prototypes -DUSE_TURN -DUSE_ICE -DUSE_RFC_3489_BACKWARDS_COMPATIBLE -DUSE_STUND_0_96 -DUSE_STUN_PEDANTIC -DNR_SOCKET_IS_VOID_PTR -Drestrict=__restrict__ -DNO_REG_RPC=1 -DHAVE_VFPRINTF=1 -DRETSIGTYPE=void -DNEW_STDIO -DHAVE_STRDUP=1 -DHAVE_STRLCPY=1 -DHAVE_LIBM=1 -DHAVE_SYS_TIME_H=1 -DTIME_WITH_SYS_TIME_H=1 -D${NICER_OS} -D__UNUSED__=\"__attribute__((unused))\"")
 
+target_link_libraries(nicer nrappkit)
+
+install(TARGETS nicer
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib)
+
+list(APPEND nicer__include_public_dirs
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/event"
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/log"
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/plugin"
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/registry"
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/share"
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/stats"
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/util"
+  "${NRAPPKIT_BUILD}/src/nrappkit/src/port"
+  "${NICER_SOURCE}/src/crypto"
+  "${NICER_SOURCE}/src/ice"
+  "${NICER_SOURCE}/src/net"
+  "${NICER_SOURCE}/src/stun"
+  "${NICER_SOURCE}/src/util")
+
 set_property(TARGET nicer APPEND PROPERTY INCLUDE_DIRECTORIES ${nicer__include_dirs})
 
-#target_link_libraries(nicer nrappkit)
+install(DIRECTORY ${nicer__include_public_dirs} DESTINATION ${NICER_BUILD}/include)
