@@ -94,7 +94,7 @@ add_library(nicer STATIC ${nicer__c_srcs} ${nicer__other_srcs})
 
 set(NRAPPKIT_BUILD "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit")
 ExternalProject_Add(project_nrappkit
-  GIT_REPOSITORY "git@github.com:lynckia/nrappkit.git"
+  GIT_REPOSITORY "https://github.com/lynckia/nrappkit.git"
   GIT_TAG "master"
   PREFIX ${NRAPPKIT_BUILD}
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD}
