@@ -63,8 +63,12 @@ static char *RCSSTRING __UNUSED__="$Id: addrs.c,v 1.2 2008/04/28 18:21:30 ekr Ex
 /* Work around an Android NDK < r8c bug */
 #undef __unused
 #else
+#ifndef NOLINUXIF
 #include <linux/if.h> /* struct ifreq, IFF_POINTTOPOINT */
 #include <linux/wireless.h> /* struct iwreq */
+#else
+#include <net/if.h> /* struct ifreq, IFF_POINTTOPOINT */
+#endif
 #include <linux/ethtool.h> /* struct ethtool_cmd */
 #include <linux/sockios.h> /* SIOCETHTOOL */
 #endif /* ANDROID */
@@ -281,7 +285,7 @@ stun_getifaddrs(nr_local_addr addrs[], int maxaddrs, int *count)
           if (r=nr_sockaddr_to_transport_addr(if_addr->ifa_addr, IPPROTO_UDP, 0, &(addrs[*count].addr))) {
             r_log(NR_LOG_STUN, LOG_ERR, "nr_sockaddr_to_transport_addr error r = %d", r);
           } else {
-#if defined(LINUX) && !defined(ANDROID)
+#if defined(LINUX) && !defined(ANDROID) && !defined(NOLINUXIF)
             struct ethtool_cmd ecmd;
             struct ifreq ifr;
             struct iwreq wrq;
