@@ -47,7 +47,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #else
+#ifndef NOLINUXIF
 #include <linux/if.h>
+#else
+#include <net/if.h>
+#endif
 #endif
 #ifndef BSD
 #include <net/route.h>

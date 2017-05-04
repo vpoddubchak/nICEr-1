@@ -149,7 +149,7 @@ ELSE()
   "${NRAPPKIT_INCLUDE}/port/linux/include/sys")
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
-set_target_properties(nicer PROPERTIES COMPILE_FLAGS "-g -fPIC -Wall -Wno-parentheses -Wno-strict-prototypes -Wmissing-prototypes -DUSE_TURN -DUSE_ICE -DUSE_RFC_3489_BACKWARDS_COMPATIBLE -DUSE_STUND_0_96 -DUSE_STUN_PEDANTIC -Drestrict=__restrict__ -DNO_REG_RPC=1 -DHAVE_VFPRINTF=1 -DRETSIGTYPE=void -DNEW_STDIO -DHAVE_STRDUP=1 -DHAVE_STRLCPY=1 -DHAVE_LIBM=1 -DHAVE_SYS_TIME_H=1 -DTIME_WITH_SYS_TIME_H=1 -D${NICER_OS} -D__UNUSED__=\"__attribute__((unused))\"")
+set_target_properties(nicer PROPERTIES COMPILE_FLAGS "-g -fPIC -Wall -Wno-parentheses -Wno-strict-prototypes -Wmissing-prototypes -DUSE_TURN -DUSE_ICE -DUSE_RFC_3489_BACKWARDS_COMPATIBLE -DUSE_STUND_0_96 -DUSE_STUN_PEDANTIC -Drestrict=__restrict__ -DNO_REG_RPC=1 -DHAVE_VFPRINTF=1 -DRETSIGTYPE=void -DNEW_STDIO -DHAVE_STRDUP=1 -DHAVE_STRLCPY=1 -DHAVE_LIBM=1 -DHAVE_SYS_TIME_H=1 -DTIME_WITH_SYS_TIME_H=1 -D${NICER_OS} -DNOLINUXIF -D__UNUSED__=\"__attribute__((unused))\"")
 
 target_link_libraries(nicer PRIVATE nrappkit)
 
