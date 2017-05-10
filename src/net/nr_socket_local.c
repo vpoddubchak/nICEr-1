@@ -231,8 +231,8 @@ static int nr_socket_local_recvfrom(void *obj,void * restrict buf,
     }
     *len=r;
 
-    if(r=nr_sockaddr_to_transport_addr((struct sockaddr *)&from,fromlen,
-      lcl->my_addr.protocol,addr))
+    if(r=nr_sockaddr_to_transport_addr((struct sockaddr *)&from,
+      lcl->my_addr.protocol,1,addr))
       ABORT(r);
 
     //r_log(LOG_GENERIC,LOG_DEBUG,"Read %d bytes from %s",*len,addr->as_string);
