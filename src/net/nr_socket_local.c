@@ -140,7 +140,6 @@ int nr_socket_local_create(void *obj, nr_transport_addr *addr, nr_socket **sockp
 
   }
 #endif
-
     nr_transport_addr_copy(&lcl->my_addr,addr);
 
     /* If we have a wildcard port, patch up the addr */
@@ -150,11 +149,10 @@ int nr_socket_local_create(void *obj, nr_transport_addr *addr, nr_socket **sockp
         //r_log_e(LOG_GENERIC,LOG_ERR,"Couldn't get socket address");
         ABORT(R_INTERNAL);
       }
-      if(r=nr_sockaddr_to_transport_addr((struct sockaddr *)&addr6,namelen,
-        addr->protocol,&lcl->my_addr))
+      if(r=nr_sockaddr_to_transport_addr((struct sockaddr *)&addr6,
+        addr->protocol,1,&lcl->my_addr))
         ABORT(r);
     }
-
     if(r=nr_socket_create_int(lcl, &nr_socket_local_vtbl, sockp))
       ABORT(r);
 
