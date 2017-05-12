@@ -1488,7 +1488,7 @@ int nr_ice_component_nominated_pair(nr_ice_component *comp, nr_ice_cand_pair *pa
     /* Cancel checks in WAITING and FROZEN per ICE S 8.1.2 */
     p2=TAILQ_FIRST(&comp->stream->trigger_check_queue);
     while(p2){
-      if((p2 != pair) &&
+      if((strcmp(p2->as_string, pair->as_string) != 0) &&
          (p2->remote->component->component_id == comp->component_id)) {
         assert(p2->state == NR_ICE_PAIR_STATE_WAITING ||
                p2->state == NR_ICE_PAIR_STATE_CANCELLED);
@@ -1502,7 +1502,7 @@ int nr_ice_component_nominated_pair(nr_ice_component *comp, nr_ice_cand_pair *pa
     }
     p2=TAILQ_FIRST(&comp->stream->check_list);
     while(p2){
-      if((p2 != pair) &&
+      if((strcmp(p2->as_string, pair->as_string) != 0) &&
          (p2->remote->component->component_id == comp->component_id) &&
          ((p2->state == NR_ICE_PAIR_STATE_FROZEN) ||
           (p2->state == NR_ICE_PAIR_STATE_WAITING))) {
@@ -1714,4 +1714,3 @@ int nr_ice_component_get_default_candidate(nr_ice_component *comp, nr_ice_candid
     return(_status);
 
   }
-
