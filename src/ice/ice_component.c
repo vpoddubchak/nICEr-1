@@ -1540,7 +1540,8 @@ int nr_ice_component_nominated_pair(nr_ice_component *comp, nr_ice_cand_pair *pa
       if((strcmp(p2->as_string, pair->as_string) != 0) &&
          (p2->remote->component->component_id == comp->component_id)) {
         assert(p2->state == NR_ICE_PAIR_STATE_WAITING ||
-               p2->state == NR_ICE_PAIR_STATE_CANCELLED);
+               p2->state == NR_ICE_PAIR_STATE_CANCELLED ||
+               p2->state == NR_ICE_PAIR_STATE_FAILED);
         r_log(LOG_ICE,LOG_INFO,"ICE-PEER(%s)/STREAM(%s)/COMP(%d)/CAND-PAIR(%s): cancelling FROZEN/WAITING pair %s in trigger check queue because CAND-PAIR(%s) was nominated.",comp->stream->pctx->label,comp->stream->label,comp->component_id,p2->codeword,p2->as_string,pair->codeword);
 
         if(r=nr_ice_candidate_pair_cancel(pair->pctx,p2,0))
