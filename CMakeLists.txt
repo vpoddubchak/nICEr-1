@@ -92,12 +92,18 @@ list(APPEND nicer__other_srcs
 
 add_library(nicer STATIC ${nicer__c_srcs} ${nicer__other_srcs})
 
+IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set (ADDITIONAL_CFLAGS "")
+ELSE()
+  set (ADDITIONAL_CFLAGS "-DUSE_EPOLL=1")
+ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+
 set(NRAPPKIT_BUILD "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit")
 ExternalProject_Add(project_nrappkit
   GIT_REPOSITORY "https://github.com/lynckia/nrappkit.git"
-  GIT_TAG "master"
+  GIT_TAG "1.0"
   PREFIX ${NRAPPKIT_BUILD}
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD}
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD} -DCMAKE_C_FLAGS="${ADDITIONAL_CFLAGS}"
   DOWNLOAD_DIR "${NRAPPKIT_BUILD}/src"
   INSTALL_DIR "${NRAPPKIT_BUILD}/out"
 )
