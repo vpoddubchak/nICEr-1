@@ -101,7 +101,7 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 set(NRAPPKIT_BUILD "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit")
 ExternalProject_Add(project_nrappkit
   GIT_REPOSITORY "https://github.com/lynckia/nrappkit.git"
-  GIT_TAG "1.0"
+  GIT_TAG "1.1"
   PREFIX ${NRAPPKIT_BUILD}
   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD} -DCMAKE_C_FLAGS="${ADDITIONAL_CFLAGS}"
   DOWNLOAD_DIR "${NRAPPKIT_BUILD}/src"
