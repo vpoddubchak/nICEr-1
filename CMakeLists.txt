@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 2.6)
 
+find_package(PkgConfig)
+#functions
+function(test_lib LIB_NAME)
+  if (${LIB_NAME} MATCHES "^.*-NOTFOUND")
+    message(FATAL_ERROR "lib not found: " ${LIB_NAME} " check README")
+    return()
+  endif(${LIB_NAME} MATCHES "^.*-NOTFOUND")
+endfunction(test_lib)
+
 include(ExternalProject)
 
 project(nicer)
@@ -92,6 +101,12 @@ list(APPEND nicer__other_srcs
 
 add_library(nicer STATIC ${nicer__c_srcs} ${nicer__other_srcs})
 
+# OPENSSL
+find_library(SSL ssl HINTS "${THIRD_PARTY_LIB}")
+test_lib(${SSL})
+find_library(CRYPTO crypto HINTS "${THIRD_PARTY_LIB}")
+test_lib(${CRYPTO})
+
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set (ADDITIONAL_CFLAGS "")
 ELSE()
@@ -101,9 +116,9 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 set(NRAPPKIT_BUILD "${CMAKE_CURRENT_BINARY_DIR}/third_party/nrappkit")
 ExternalProject_Add(project_nrappkit
   GIT_REPOSITORY "https://github.com/lynckia/nrappkit.git"
-  GIT_TAG "1.4"
+  GIT_TAG "1.5"
   PREFIX ${NRAPPKIT_BUILD}
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD} -DCMAKE_C_FLAGS="${ADDITIONAL_CFLAGS}"
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NRAPPKIT_BUILD} -DCMAKE_C_FLAGS="${ADDITIONAL_CFLAGS}" -DTHIRD_PARTY_LIB=${THIRD_PARTY_LIB}
   DOWNLOAD_DIR "${NRAPPKIT_BUILD}/src"
   INSTALL_DIR "${NRAPPKIT_BUILD}/out"
 )
@@ -157,7 +172,7 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 set_target_properties(nicer PROPERTIES COMPILE_FLAGS "-g -fPIC -Wall -Wno-parentheses -Wno-strict-prototypes -Wmissing-prototypes -DUSE_TURN -DUSE_ICE -DUSE_RFC_3489_BACKWARDS_COMPATIBLE -DUSE_STUND_0_96 -DUSE_STUN_PEDANTIC -Drestrict=__restrict__ -DNO_REG_RPC=1 -DHAVE_VFPRINTF=1 -DRETSIGTYPE=void -DNEW_STDIO -DHAVE_STRDUP=1 -DHAVE_STRLCPY=1 -DHAVE_LIBM=1 -DHAVE_SYS_TIME_H=1 -DTIME_WITH_SYS_TIME_H=1 -D${NICER_OS} -DNOLINUXIF -D__UNUSED__=\"__attribute__((unused))\"")
 
-target_link_libraries(nicer PRIVATE nrappkit)
+target_link_libraries(nicer PUBLIC ${SSL} ${CRYPTO} PRIVATE nrappkit)
 
 
 list(APPEND nicer__include_public_dirs
